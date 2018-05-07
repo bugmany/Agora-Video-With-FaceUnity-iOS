@@ -88,11 +88,6 @@
     [super viewWillDisappear:animated];
 }
 
-- (void)dealloc
-{
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
-}
-
 - (void)addObserver{
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(willResignActive) name:UIApplicationWillResignActiveNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(willEnterForeground) name:UIApplicationWillEnterForegroundNotification object:nil];
@@ -287,6 +282,7 @@
 }
 
 - (IBAction)leaveBtnClick:(UIButton *)sender {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self.mCamera stopCapture];
     [[FUManager shareManager] destoryItems];
     [self.agoraKit setVideoSource:nil];
