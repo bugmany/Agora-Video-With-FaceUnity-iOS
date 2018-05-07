@@ -289,6 +289,7 @@
 - (IBAction)leaveBtnClick:(UIButton *)sender {
     [self.mCamera stopCapture];
     [[FUManager shareManager] destoryItems];
+    [self.agoraKit setVideoSource:nil];
     [self.agoraKit leaveChannel:nil];
     [self.localRenderView removeFromSuperview];
     if (self.count > 0) {
