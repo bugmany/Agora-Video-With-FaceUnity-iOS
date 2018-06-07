@@ -14,7 +14,7 @@
 #import <FUAPIDemoBar/FUAPIDemoBar.h>
 #import <AgoraRtcEngineKit/AgoraRtcEngineKit.h>
 
-@interface RoomViewController ()<FUAPIDemoBarDelegate, FUCameraDelegate, AgoraRtcEngineDelegate, AgoraVideoSourceProtocol>
+@interface RoomViewController ()<FUAPIDemoBarDelegate, FUCameraDelegate, AgoraRtcEngineDelegate>
 
 @property (nonatomic, strong) FUCamera *mCamera;   //Faceunity Camera
 
@@ -55,8 +55,6 @@
 
 @implementation RoomViewController
 
-@synthesize consumer;
-
 - (BOOL)prefersStatusBarHidden
 {
     return YES;
@@ -79,6 +77,7 @@
     });
     
     [self loadAgoraKit];
+    [self.mCamera startCapture];
 }
 
 - (void)viewWillDisappear:(BOOL)animated
@@ -100,48 +99,22 @@
 */
 - (void)loadAgoraKit {
     self.agoraKit = [AgoraRtcEngineKit sharedEngineWithAppId:[KeyCenter AppId] delegate:self];
-    [self.agoraKit setChannelProfile:AgoraChannelProfileLiveBroadcasting];
-    [self.agoraKit setVideoProfile:AgoraVideoProfilePortrait360P swapWidthAndHeight:NO];
+    [self.agoraKit setChannelProfile:AgoraRtc_ChannelProfile_LiveBroadcasting];
+    [self.agoraKit setClientRole:AgoraRtc_ClientRole_Broadcaster withKey:nil];
     
-    [self.agoraKit setClientRole:AgoraClientRoleBroadcaster];
     [self.agoraKit enableVideo];
-    [self.agoraKit setVideoSource:self];
-    
-    // workaround for the big head issue
-    [self.agoraKit setParameters:@"{\"che.video.keep_prerotation\":false}"];
-    [self.agoraKit setParameters:@"{\"che.video.local.camera_index\":1025}"];
+    [self.agoraKit setVideoProfile:AgoraRtc_VideoProfile_360P swapWidthAndHeight:YES];
+    [self.agoraKit setExternalVideoSource:YES useTexture:YES pushMode:YES];
     
     self.count = 0;
     self.isMuted = false;
     
-    [self.agoraKit joinChannelByToken:nil channelId:self.channelName info:nil uid:0 joinSuccess:nil];
+    [self.agoraKit joinChannelByKey:nil channelName:self.channelName info:nil uid:0 joinSuccess:nil];
 
     FUOpenGLView *renderView = [[FUOpenGLView alloc] init];
     renderView.frame = self.view.frame;
     [self.containView addSubview:renderView];
     self.localRenderView = renderView;
-}
-
-#pragma mark - Agora Video Source Protocol
-
-- (BOOL)shouldInitialize {
-    return YES;
-}
-
-- (void)shouldStart {
-    [self.mCamera startCapture];
-}
-
-- (void)shouldStop {
-    [self.mCamera stopCapture];
-}
-
-- (void)shouldDispose {
-
-}
-
-- (AgoraVideoBufferType)bufferType {
-    return AgoraVideoBufferTypePixelBuffer;
 }
 
 #pragma mark - Agora Engine Delegate
@@ -160,7 +133,7 @@
         }
         self.remoteCanvas.uid = uid;
         self.remoteCanvas.view = renderView;
-        self.remoteCanvas.renderMode = AgoraVideoRenderModeHidden;
+        self.remoteCanvas.renderMode = AgoraRtc_Render_Hidden;
         [self.agoraKit setupRemoteVideo:self.remoteCanvas];
         
         self.remoteRenderView = renderView;
@@ -172,7 +145,7 @@
     }
 }
 
-- (void)rtcEngine:(AgoraRtcEngineKit *)engine didOfflineOfUid:(NSUInteger)uid reason:(AgoraUserOfflineReason)reason {
+- (void)rtcEngine:(AgoraRtcEngineKit *)engine didOfflineOfUid:(NSUInteger)uid reason:(AgoraRtcUserOfflineReason)reason {
     if (self.count > 0) {
         self.count --;
         self.remoteCanvas.view = nil;
@@ -285,7 +258,6 @@
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self.mCamera stopCapture];
     [[FUManager shareManager] destoryItems];
-    [self.agoraKit setVideoSource:nil];
     [self.agoraKit leaveChannel:nil];
     [self.localRenderView removeFromSuperview];
     if (self.count > 0) {
@@ -399,7 +371,11 @@
     });
     
     // push video frame to agora
-    [self.consumer consumePixelBuffer:pixelBuffer withTimestamp:CMSampleBufferGetPresentationTimeStamp(sampleBuffer) rotation:AgoraVideoRotationNone];
+    AgoraVideoFrame *videoFrame = [[AgoraVideoFrame alloc] init];
+    videoFrame.format = AgoraRtc_FrameFormat_texture;
+    videoFrame.textureBuf = pixelBuffer;
+    videoFrame.time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+    [self.agoraKit pushExternalVideoFrame:videoFrame];
 }
 
 static int pointCount = 0;
